@@ -7,6 +7,7 @@ import google.generativeai as genai
 import asyncio
 from typing import Optional
 import re
+import json
 
 # 環境変数を読み込み
 load_dotenv()
@@ -103,7 +104,6 @@ JSON形式で以下を返してください:
         response = model.generate_content(prompt)
         
         # レスポンスを解析
-        import json
         text = response.text
         # JSONブロックを抽出
         json_match = re.search(r'\{[^{}]*\}', text, re.DOTALL)
