@@ -131,11 +131,46 @@ JSON形式で以下を返してください:
 async def on_ready():
     """ボット起動時"""
     print(f'{bot.user} としてログインしました')
+    print(f'ボットのステータス: オンライン 🟢')
     try:
         synced = await bot.tree.sync()
         print(f'{len(synced)}個のコマンドを同期しました')
     except Exception as e:
         print(f"コマンド同期エラー: {e}")
+
+
+@bot.tree.command(name="start", description="ボットをオンラインにしてボイスチャンネルに参加します")
+async def start_command(interaction: discord.Interaction):
+    """ボットをオンラインにしてユーザーのボイスチャンネルに参加"""
+    global voice_client
+    
+    await interaction.response.defer()
+    
+    try:
+        # ボイスチャンネルへの接続確認
+        if not interaction.user.voice or not interaction.user.voice.channel:
+            await interaction.followup.send("❌ ボイスチャンネルに接続してください")
+            return
+        
+        channel = interaction.user.voice.channel
+        
+        # ボイスチャンネルに接続
+        if voice_client and voice_client.is_connected():
+            await voice_client.move_to(channel)
+            await interaction.followup.send(f"✅ ボイスチャンネル「{channel.name}」に移動しました")
+        else:
+            voice_client = await channel.connect()
+            
+            # ボットのステータスを設定
+            await bot.change_presence(status=discord.Status.online, activity=discord.Activity(type=discord.ActivityType.listening, name="カラオケ準備中"))
+            
+            await interaction.followup.send(f"✅ ボットがオンラインになりました！\n🎤 ボイスチャンネル「{channel.name}」に参加しました\n\n次のコマンドで曲を再生できます:\n`/karaoke [曲名]`")
+            print(f"🤖 ボットがオンラインになりました")
+            print(f"🔗 ボイスチャンネル「{channel.name}」に接続しました")
+        
+    except Exception as e:
+        await interaction.followup.send(f"❌ エラーが発生しました: {str(e)}")
+        print(f"スタートコマンドエラー: {e}")
 
 
 @bot.tree.command(name="karaoke", description="カラオケを開始します")
@@ -148,7 +183,7 @@ async def karaoke_command(interaction: discord.Interaction, song_name: str):
     try:
         # ボイスチャンネルへの接続確認
         if not interaction.user.voice or not interaction.user.voice.channel:
-            await interaction.followup.send("❌ ボイスチャンネルに接続してください")
+            await interaction.followup.send("❌ ボイスチャンネルに接続してください\n`/start` でボットを参加させてください")
             return
         
         channel = interaction.user.voice.channel
@@ -265,7 +300,12 @@ async def disconnect_command(interaction: discord.Interaction):
         if voice_client and voice_client.is_connected():
             await voice_client.disconnect()
             current_song = None
-            await interaction.response.send_message("👋 ボイスチャンネルから切断しました")
+            
+            # ボットのステータスをオフラインに設定
+            await bot.change_presence(status=discord.Status.idle, activity=None)
+            
+            await interaction.response.send_message("👋 ボイスチャンネルから切断しました\nボットをオフラインにしました")
+            print(f"🤖 ボットがオフラインになりました")
         else:
             await interaction.response.send_message("❌ ボイスチャンネルに接続していません")
     except Exception as e:
@@ -280,6 +320,11 @@ async def help_command(interaction: discord.Interaction):
         title="🎤 Karabot - カラオケBot",
         description="Discordでカラオケを楽しもう！",
         color=discord.Color.blurple()
+    )
+    embed.add_field(
+        name="/start",
+        value="ボットをオンラインにしてボイスチャンネルに参加します",
+        inline=False
     )
     embed.add_field(
         name="/karaoke [曲名]",
